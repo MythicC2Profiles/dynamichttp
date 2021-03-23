@@ -208,7 +208,7 @@ async def get_agent_message(request, **kwargs):
         message = await get_value(message, transforms)
         if config[request.app.name]['debug']:
             await print_flush("Forwarding along to: {}".format(config['mythic_address']))
-        response = requests.post(config['mythic_address'], verify=False, data=message, headers={"Mythic": "dynamicHTTP"})
+        response = requests.post(config['mythic_address'], verify=False, data=message, headers={"Mythic": "dynamichttp"})
         return await create_response(request, data=response.content, status=response.status_code, method="GET")
     except Exception as e:
         if config[request.app.name]['debug']:
@@ -227,7 +227,7 @@ async def post_agent_message(request, **kwargs):
         message = await get_value(message, agent_transforms)
         if config[request.app.name]['debug']:
             await print_flush("Forwarding along to: {}".format(config['mythic_address']))
-        response = requests.post(config['mythic_address'], data=message, verify=False, headers={"Mythic": "dynamicHTTP"})
+        response = requests.post(config['mythic_address'], data=message, verify=False, headers={"Mythic": "dynamichttp"})
         return await create_response(request, data=response.content, status=response.status_code, method="POST")
     except Exception as e:
         if config[request.app.name]['debug']:
