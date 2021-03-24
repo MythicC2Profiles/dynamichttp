@@ -480,6 +480,7 @@ def check_config(server_config, agent_config, method):
 
 
 def check_match_to_server(server_config, agent_message):
+    all_possible_urls = []
     for inst in server_config["instances"]:
         # only look into AgentMessage details if the urls and uri match
         for g in inst[agent_message["method"]]["AgentMessage"]:
@@ -487,6 +488,7 @@ def check_match_to_server(server_config, agent_message):
             if agent_message["uri"] != g["uri"]:
                 continue
             if not urls_match(agent_message["urls"], g["urls"]):
+                all_possible_urls.append(g["urls"])
                 continue
             else:
                 print(
@@ -509,7 +511,7 @@ def check_match_to_server(server_config, agent_message):
                     f"{bcolors.FAIL}[-]{bcolors.ENDC} Matched URLs/URI failed to match AgentMessages"
                 )
                 return False
-    print(f"{bcolors.FAIL}[-]{bcolors.ENDC} Failed to find any matching URLs/URIs")
+    print(f"{bcolors.FAIL}[-]{bcolors.ENDC} Failed to find any matching URLs/URIs in all server AgentMessage blocks: " + json.dumps(all_possible_urls))
     return False
 
 
