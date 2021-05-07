@@ -7,8 +7,6 @@ class DynamicHTTP(C2Profile):
     author = "@its_a_feature_"
     is_p2p = False
     is_server_routed = False
-    mythic_encrypts = True
-    translation_container = None
     parameters = [
         C2ProfileParameter(
             name="AESPSK",

@@ -10,6 +10,8 @@ This is a Mythic C2 Profile called dynamichttp. It simply provides a way to get 
 
 This profile leverages JSON structure for nested information about how to dynamically generate/parse HTTP messages of your choosing. This allows you to craft HTTP messages that look like anything you want rather than the static format used in the http profile.
 
+The c2 profile has `mythic_c2_container==0.0.22` PyPi package installed and reports to Mythic as version "3".
+
 
 ## How to install an agent in this format within Mythic
 
