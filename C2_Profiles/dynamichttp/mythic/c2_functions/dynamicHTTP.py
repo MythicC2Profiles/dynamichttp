@@ -1,4 +1,10 @@
 from mythic_c2_container.C2ProfileBase import *
+import json
+
+def readAgentConfig() -> str:
+    with open("../c2_code/agent_config.json", "r") as f:
+        data = json.load(f)
+        return json.dumps(data, indent=4)
 
 
 class DynamicHTTP(C2Profile):
@@ -18,6 +24,8 @@ class DynamicHTTP(C2Profile):
             crypto_type=True
         ),
         C2ProfileParameter(
-            name="raw_c2_config", description="Agent JSON Config", default_value=""
+            name="raw_c2_config", description="Agent JSON Config", default_value=readAgentConfig()
         ),
     ]
+
+

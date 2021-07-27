@@ -32,7 +32,7 @@ Legend:
 - Dotted line is a message within that connection
 
 ## Configuration Options
-The profile reads a `config.json` file for a set of instances of `Sanic` webservers to stand up (`443` by default) and redirects the content. There is a very thorough writeup on the profile located with the [public documentation](https://docs.apfell.net/v/version-1.5/c2-profiles/dynamichttp).
+The profile reads a `config.json` file for a set of instances of `Sanic` webservers to stand up (`9000` by default) and redirects the content. There is a very thorough writeup on the profile located with the [public documentation](https://docs.apfell.net/v/version-1.5/c2-profiles/dynamichttp).
 
 There are two pieces to the configuration and they need to match up for everything to go smoothly. The server has an array of `instances` that define how communication happens, including:
 - Where the message is located in the HTTP request
@@ -56,7 +56,7 @@ Started with pid: 15...
 Output: Opening config and starting instances...
 Debugging output is enabled. This might be a performance it, but gives more context
 not using SSL for port 443
-[2020-07-30 16:46:50 +0000] [15] [INFO] Goin' Fast @ http://0.0.0.0:443
+[2020-07-30 16:46:50 +0000] [15] [INFO] Goin' Fast @ http://0.0.0.0:9000
 ```
 
 A note about debugging:
@@ -111,8 +111,8 @@ its-a-feature@ubuntu:~/Desktop/Apfell/C2_Profiles/dynamicHTTP/c2_code$ python3 c
 ```
   
 ### Profile Options
-#### Base64 of a 32-byte AES Key
-Base64 value of the AES pre-shared key to use for communication with the agent. This will be auto-populated with a static key for the operation, but you can also replace this with the base64 of any 32 bytes you want. If you don't want to use encryption here, blank out this value.
+#### AESPSK
+This is a choice between no encryption or using Mythic's AES256_HMAC encryption.
 
 #### Agent Config
 This is the JSON agent config that would go into the agent. 
