@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import logging
 
 from sanic import Sanic
 from sanic.response import html, redirect, raw
@@ -250,118 +251,120 @@ async def post_agent_message(request, **kwargs):
 
 
 if __name__ == "__main__":
-    config_file = open("config.json", 'rb')
-    main_config = json.loads(config_file.read().decode('utf-8'))
-    print("Opening config and starting instances...")
-    sys.stdout.flush()
-    # basic mapping of the general endpoints to the real endpoints
-    config['mythic_address'] = os.environ['MYTHIC_ADDRESS']
-    # now look at the specific instances to start
-    for inst in main_config['instances']:
-        config[str(inst['port'])] = {'debug': inst['debug'],
-                                     'no_match': inst['no_match'],
-                                     'POST': {  # these are server response configurations
-                                         'ServerHeaders': inst['POST']['ServerHeaders'],
-                                         'ServerCookies': inst['POST']['ServerCookies'],
-                                         'ServerBody': inst['POST']['ServerBody']
-                                     },
-                                     "GET": {  # these are server response configurations
-                                         'ServerHeaders': inst['GET']['ServerHeaders'],
-                                         'ServerCookies': inst['GET']['ServerCookies'],
-                                         'ServerBody': inst['GET']['ServerBody']
-                                     }}
-        if inst['debug']:
-            print("Debugging output is enabled. This might be a performance it, but gives more context")
-        else:
-            print("Debugging output is disabled")
-        sys.stdout.flush()
-        # now to create an app instance too handle responses
-        app = Sanic(str(inst['port']))
-        app.config['REQUEST_MAX_SIZE'] = 1000000000
-        app.config['REQUEST_TIMEOUT'] = 600
-        app.config['RESPONSE_TIMEOUT'] = 600
-        app.error_handler.add(Exception, no_match)
-
-        # do a little extra processing here once so we don't have to do extra processing for each request
-        # for each endpoint need to track:
-        #   1. where the data is located (URI, query, cookie, body, header)
-        #   2. what needs to be done to access the value
-        #       (access specific field, certain offset into data, decode first, etc)
-        #   3. what needs to be done to get the final value out (decode, remove extra data, etc)
-
-        # an instance can have multiple URLs and schemes for each GET/POST, so loop through all of that
-        for g in inst['GET']['AgentMessage']:
-            app.add_route(get_agent_message, g['uri'], methods=['GET'])
-            config[str(inst['port'])]['GET'][g['uri']] = {}
-            # we need to find where the "message" parameter exists so we know where the data will be
-            for p in g['QueryParameters']:
-                if p['value'] == "message":
-                    config[str(inst['port'])]['GET'][g['uri']]['location'] = "QueryParameters"
-                    config[str(inst['port'])]['GET'][g['uri']]['value'] = p
-            for p in g['Cookies']:
-                if p['value'] == 'message':
-                    config[str(inst['port'])]['GET'][g['uri']]['location'] = "Cookies"
-                    config[str(inst['port'])]['GET'][g['uri']]['value'] = p
-            for p in g['urlFunctions']:
-                if p['name'] == '<message:string>':
-                    config[str(inst['port'])]['GET'][g['uri']]['location'] = "URI"
-                    config[str(inst['port'])]['GET'][g['uri']]['value'] = p
-            if 'location' not in config[str(inst['port'])]['GET'][g['uri']]:
-                # if we haven't set it yet, data must be in the body
-                config[str(inst['port'])]['GET'][g['uri']]['location'] = "Body"
-                config[str(inst['port'])]['GET'][g['uri']]['value'] = g['Body']
-        for g in inst['POST']['AgentMessage']:
-            app.add_route(post_agent_message, g['uri'], methods=['POST'])
-            config[str(inst['port'])]['POST'][g['uri']] = {}
-            # we need to find where the "message" parameter exists so we know where the data will be
-            for p in g['QueryParameters']:
-                if p['value'] == "message":
-                    config[str(inst['port'])]['POST'][g['uri']]['location'] = "QueryParameters"
-                    config[str(inst['port'])]['POST'][g['uri']]['value'] = p
-            for p in g['Cookies']:
-                if p['value'] == 'message':
-                    config[str(inst['port'])]['POST'][g['uri']]['location'] = "Cookies"
-                    config[str(inst['port'])]['POST'][g['uri']]['value'] = p
-            for p in g['urlFunctions']:
-                if p['name'] == '<message:string>':
-                    config[str(inst['port'])]['POST'][g['uri']]['location'] = "URI"
-                    config[str(inst['port'])]['POST'][g['uri']]['value'] = p
-            if 'location' not in config[str(inst['port'])]['POST'][g['uri']]:
-                # if we haven't set it yet, data must be in the body
-                config[str(inst['port'])]['POST'][g['uri']]['location'] = "Body"
-                config[str(inst['port'])]['POST'][g['uri']]['value'] = g['Body']
-
-        keyfile = Path(inst['key_path'])
-        certfile = Path(inst['cert_path'])
-        if keyfile.is_file() and certfile.is_file():
-            context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
-            context.load_cert_chain(inst['cert_path'], keyfile=inst['key_path'])
-            if inst['debug']:
-                server = app.create_server(host="0.0.0.0", port=inst['port'], ssl=context, debug=False, return_asyncio_server=True, access_log=True)
-            else:
-                server = app.create_server(host="0.0.0.0", port=inst['port'], ssl=context, debug=False, return_asyncio_server=True, access_log=False)
-            if inst['debug']:
-                print("using SSL for port {}".format(inst['port']))
-                sys.stdout.flush()
-        else:
-            if inst['debug']:
-                print("not using SSL for port {}".format(inst['port']))
-                sys.stdout.flush()
-            if inst['debug']:
-                server = app.create_server(host="0.0.0.0", port=inst['port'], debug=False, return_asyncio_server=True, access_log=True)
-            else:
-                server = app.create_server(host="0.0.0.0", port=inst['port'], debug=False, return_asyncio_server=True, access_log=False)
-        task = asyncio.ensure_future(server)
-
     try:
-        loop = asyncio.get_event_loop()
-        def callback(fut):
-            try:
-                fetch_count = fut.result()
-            except OSError as e:
-                print("probably the port set is being used")
-                fut.get_loop().stop()
-        task.add_done_callback(callback)
-        loop.run_forever()
-    except:
-        loop.stop()
+        config_file = open("config.json", 'rb')
+        main_config = json.loads(config_file.read().decode('utf-8'))
+        print("Opening config and starting instances...")
+        sys.stdout.flush()
+        # basic mapping of the general endpoints to the real endpoints
+        config['mythic_address'] = f"http://{os.environ['MYTHIC_SERVER_HOST']}:{os.environ['MYTHIC_SERVER_PORT']}"
+        # now look at the specific instances to start
+        for inst in main_config['instances']:
+            config[str(inst['port'])] = {'debug': inst['debug'],
+                                         'no_match': inst['no_match'],
+                                         'POST': {  # these are server response configurations
+                                             'ServerHeaders': inst['POST']['ServerHeaders'],
+                                             'ServerCookies': inst['POST']['ServerCookies'],
+                                             'ServerBody': inst['POST']['ServerBody']
+                                         },
+                                         "GET": {  # these are server response configurations
+                                             'ServerHeaders': inst['GET']['ServerHeaders'],
+                                             'ServerCookies': inst['GET']['ServerCookies'],
+                                             'ServerBody': inst['GET']['ServerBody']
+                                         }}
+            if inst['debug']:
+                print("Debugging output is enabled. This might be a performance it, but gives more context")
+            else:
+                print("Debugging output is disabled")
+            sys.stdout.flush()
+            # now to create an app instance too handle responses
+            app = Sanic(f"p{str(inst['port'])}")
+            app.config['REQUEST_MAX_SIZE'] = 1000000000
+            app.config['REQUEST_TIMEOUT'] = 600
+            app.config['RESPONSE_TIMEOUT'] = 600
+            app.error_handler.add(Exception, no_match)
+
+            # do a little extra processing here once so we don't have to do extra processing for each request
+            # for each endpoint need to track:
+            #   1. where the data is located (URI, query, cookie, body, header)
+            #   2. what needs to be done to access the value
+            #       (access specific field, certain offset into data, decode first, etc)
+            #   3. what needs to be done to get the final value out (decode, remove extra data, etc)
+
+            # an instance can have multiple URLs and schemes for each GET/POST, so loop through all of that
+            for g in inst['GET']['AgentMessage']:
+                app.add_route(get_agent_message, g['uri'], methods=['GET'])
+                config[str(inst['port'])]['GET'][g['uri']] = {}
+                # we need to find where the "message" parameter exists so we know where the data will be
+                for p in g['QueryParameters']:
+                    if p['value'] == "message":
+                        config[str(inst['port'])]['GET'][g['uri']]['location'] = "QueryParameters"
+                        config[str(inst['port'])]['GET'][g['uri']]['value'] = p
+                for p in g['Cookies']:
+                    if p['value'] == 'message':
+                        config[str(inst['port'])]['GET'][g['uri']]['location'] = "Cookies"
+                        config[str(inst['port'])]['GET'][g['uri']]['value'] = p
+                for p in g['urlFunctions']:
+                    if p['name'] == '<message:string>':
+                        config[str(inst['port'])]['GET'][g['uri']]['location'] = "URI"
+                        config[str(inst['port'])]['GET'][g['uri']]['value'] = p
+                if 'location' not in config[str(inst['port'])]['GET'][g['uri']]:
+                    # if we haven't set it yet, data must be in the body
+                    config[str(inst['port'])]['GET'][g['uri']]['location'] = "Body"
+                    config[str(inst['port'])]['GET'][g['uri']]['value'] = g['Body']
+            for g in inst['POST']['AgentMessage']:
+                app.add_route(post_agent_message, g['uri'], methods=['POST'])
+                config[str(inst['port'])]['POST'][g['uri']] = {}
+                # we need to find where the "message" parameter exists so we know where the data will be
+                for p in g['QueryParameters']:
+                    if p['value'] == "message":
+                        config[str(inst['port'])]['POST'][g['uri']]['location'] = "QueryParameters"
+                        config[str(inst['port'])]['POST'][g['uri']]['value'] = p
+                for p in g['Cookies']:
+                    if p['value'] == 'message':
+                        config[str(inst['port'])]['POST'][g['uri']]['location'] = "Cookies"
+                        config[str(inst['port'])]['POST'][g['uri']]['value'] = p
+                for p in g['urlFunctions']:
+                    if p['name'] == '<message:string>':
+                        config[str(inst['port'])]['POST'][g['uri']]['location'] = "URI"
+                        config[str(inst['port'])]['POST'][g['uri']]['value'] = p
+                if 'location' not in config[str(inst['port'])]['POST'][g['uri']]:
+                    # if we haven't set it yet, data must be in the body
+                    config[str(inst['port'])]['POST'][g['uri']]['location'] = "Body"
+                    config[str(inst['port'])]['POST'][g['uri']]['value'] = g['Body']
+
+            keyfile = Path(inst['key_path'])
+            certfile = Path(inst['cert_path'])
+            if keyfile.is_file() and certfile.is_file():
+                context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
+                context.load_cert_chain(inst['cert_path'], keyfile=inst['key_path'])
+                if inst['debug']:
+                    server = app.create_server(host="0.0.0.0", port=inst['port'], ssl=context, debug=False, return_asyncio_server=True, access_log=True)
+                else:
+                    server = app.create_server(host="0.0.0.0", port=inst['port'], ssl=context, debug=False, return_asyncio_server=True, access_log=False)
+                if inst['debug']:
+                    print("using SSL for port {}".format(inst['port']))
+                    sys.stdout.flush()
+            else:
+                if inst['debug']:
+                    print("not using SSL for port {}".format(inst['port']))
+                    sys.stdout.flush()
+                if inst['debug']:
+                    server = app.create_server(host="0.0.0.0", port=inst['port'], debug=False, return_asyncio_server=True, access_log=True)
+                else:
+                    server = app.create_server(host="0.0.0.0", port=inst['port'], debug=False, return_asyncio_server=True, access_log=False)
+            task = asyncio.ensure_future(server)
+        try:
+            loop = asyncio.get_event_loop()
+            def callback(fut):
+                try:
+                    fetch_count = fut.result()
+                except OSError as e:
+                    print("probably the port set is being used")
+                    fut.get_loop().stop()
+            task.add_done_callback(callback)
+            loop.run_forever()
+        except:
+            loop.stop()
+    except Exception as e:
+        logging.exception(e)
