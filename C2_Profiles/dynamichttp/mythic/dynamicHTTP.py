@@ -1,98 +1,70 @@
-from mythic_c2_container.MythicRPC import *
-import sys
+from mythic_container.C2ProfileBase import *
 import json
 from pathlib import Path
-import netifaces
 import os
 
-# request is a dictionary: {"action": func_name, "message": "the input",  "task_id": task id num}
-# must return an RPCResponse() object and set .status to an instance of RPCStatus and response to str of message
-async def test(request):
-    response = RPCResponse()
-    response.status = RPCStatus.Success
-    response.response = "hello"
-    resp = await MythicRPC().execute("create_event_message", message="Test message", warning=False)
-    return response
+
+def readAgentConfig() -> str:
+    with open("./c2_code/agent_config.json", "r") as f:
+        data = json.load(f)
+        return json.dumps(data, indent=4)
 
 
-# The opsec function is called when a payload is created as a check to see if the parameters supplied are good
-# The input for "request" is a dictionary of:
-# {
-#   "action": "opsec",
-#   "parameters": {
-#       "param_name": "param_value",
-#       "param_name2: "param_value2",
-#   }
-# }
-# This function should return one of two things:
-#   For success: {"status": "success", "message": "your success message here" }
-#   For error: {"status": "error", "error": "your error message here" }
-async def opsec(request):
-    return {"status": "success", "message": "No OPSEC Check Performed\n"}
+class DynamicHTTP(C2Profile):
+    name = "dynamichttp"
+    description = "Manipulate HTTP(S) requests and responses"
+    author = "@its_a_feature_"
+    is_p2p = False
+    is_server_routed = False
+    server_folder_path = Path(".") / "c2_code"
+    server_binary_path = server_folder_path / "server.py"
+    parameters = [
+        C2ProfileParameter(
+            name="AESPSK",
+            description="Crypto type",
+            default_value="aes256_hmac",
+            parameter_type=ParameterType.ChooseOne,
+            choices=["aes256_hmac", "none"],
+            required=False,
+            crypto_type=True
+        ),
+        C2ProfileParameter(
+            name="raw_c2_config", description="Agent JSON Config", default_value=readAgentConfig()
+        ),
+    ]
 
-
-# The config_check function is called when a payload is created as a check to see if the parameters supplied
-#   to the agent match up with what's in the C2 profile
-# The input for "request" is a dictionary of:
-# {
-#   "action": "config_check",
-#   "parameters": {
-#       "param_name": "param_value",
-#       "param_name2: "param_value2",
-#   }
-# }
-#
-# This function should return one of two things:
-#   For success: {"status": "success", "message": "your success message here" }
-#   For error: {"status": "error", "error": "your error message here" }
-async def config_check(request):
-    output = ""
-    try:
-        with open("../c2_code/config.json") as f:
-            config = json.load(f)
-            agent_config = json.loads(request["parameters"]["raw_c2_config"])
-            output += f"\n[*] Checking server config for layout structure"
-            status = check_server_layout(config)
-            if status["status"] == "error":
-                return {"status": 'error', "error": output + status["error"]}
-            output += status["output"]
-            output += f"\n[+] Server config layout structure is good"
-            output += f"\n[*] Checking agent config for layout structure"
-            status = check_agent_config_layout(agent_config)
-            if status["status"] == "error":
-                return {"status": "error", "error": output + status["error"]}
-            output += status["output"]
-            output += f"\n[+] Agent config layout structure is good"
-            # now check that server_config can understand an agent_config message
-            # first check a GET request
-            status = check_config(config,agent_config, "GET")
-            if status["status"] == "error":
-                return {"status": "error", "error": output + status["error"]}
-            output += status["output"]
-            status = check_config(config, agent_config, "POST")
-            if status["status"] == "error":
-                return {"status": "error", "error": output + status["error"]}
-            output += status["output"]
-            output += "\n[+] Agent and Server Fully Match!"
-            return {"status": "success", "message": output}
-    except Exception as e:
-        return {"status": "error", "error": str(sys.exc_info()[-1].tb_lineno) + str(e)}
-
-
-# The redirect_rules function is called on demand by an operator to generate redirection rules for a specific payload
-# The input for "request" is a dictionary of:
-# {
-#   "action": "redirect_rules",
-#   "parameters": {
-#       "param_name": "param_value",
-#       "param_name2: "param_value2",
-#   }
-# }
-# This function should return one of two things:
-#   For success: {"status": "success", "message": "your success message here" }
-#   For error: {"status": "error", "error": "your error message here" }
-async def redirect_rules(request):
-    return {"status": "error", "error": "Not implemented for dynamichttp yet"}
+    async def config_check(self, inputMsg: C2ConfigCheckMessage) -> C2ConfigCheckMessageResponse:
+        output = ""
+        try:
+            with open("./c2_code/config.json") as f:
+                config = json.load(f)
+                agent_config = json.loads(inputMsg.Parameters["raw_c2_config"])
+                output += f"\n[*] Checking server config for layout structure"
+                status = check_server_layout(config)
+                if status["status"] == "error":
+                    return C2ConfigCheckMessageResponse(Success=False, Error=output + status["error"])
+                output += status["output"]
+                output += f"\n[+] Server config layout structure is good"
+                output += f"\n[*] Checking agent config for layout structure"
+                status = check_agent_config_layout(agent_config)
+                if status["status"] == "error":
+                    return C2ConfigCheckMessageResponse(Success=False, Error=output + status["error"])
+                output += status["output"]
+                output += f"\n[+] Agent config layout structure is good"
+                # now check that server_config can understand an agent_config message
+                # first check a GET request
+                status = check_config(config, agent_config, "GET")
+                if status["status"] == "error":
+                    return C2ConfigCheckMessageResponse(Success=False, Error=output + status["error"])
+                output += status["output"]
+                status = check_config(config, agent_config, "POST")
+                if status["status"] == "error":
+                    return C2ConfigCheckMessageResponse(Success=False, Error=output + status["error"])
+                output += status["output"]
+                output += "\n[+] Agent and Server Fully Match!"
+                return C2ConfigCheckMessageResponse(Success=True, Message=output)
+        except Exception as e:
+            return C2ConfigCheckMessageResponse(Success=False, Error=str(sys.exc_info()[-1].tb_lineno) + str(e))
 
 
 def check_server_layout(server_config) -> dict:
@@ -142,7 +114,7 @@ def check_server_layout(server_config) -> dict:
                         output += '\n[-] Missing "name" parameter in urlFunction'
                         return {"status": "error", "error": output}
                     if "value" not in f:
-                        output +=  '\n[-] Missing "value" parameter in urlFunction. This is the starting value before transforms are applied'
+                        output += '\n[-] Missing "value" parameter in urlFunction. This is the starting value before transforms are applied'
                         return {"status": "error", "error": output}
                     if "transforms" not in f:
                         output += '\n[-] Missing "transforms" array. If no transforms needed, set to empty array []'
@@ -158,7 +130,7 @@ def check_server_layout(server_config) -> dict:
                     output += '\n[-] Missing "AgentHeaders" dictionary, this can be blank if the agent won\'t set any headers (i.e. {}'
                     return {"status": "error", "error": output}
                 if "QueryParameters" not in m:
-                    output +=  '\n[-] Missing "QueryParameters" array in GET. If no query parameters will be set, leave as empty array []'
+                    output += '\n[-] Missing "QueryParameters" array in GET. If no query parameters will be set, leave as empty array []'
                     return {"status": "error", "error": output}
                 for f in m["QueryParameters"]:
                     if "name" not in f:
