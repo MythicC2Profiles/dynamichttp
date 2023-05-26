@@ -144,7 +144,6 @@ async def create_response(request, data, status=200, method="POST"):
 
 
 async def no_match(request, exception):
-    global config
     if config[request.app.name]['debug']:
         await print_flush("hit a 'no_match' case")
     if config[request.app.name]['no_match']['action'] == "":
@@ -257,10 +256,10 @@ if __name__ == "__main__":
         print("Opening config and starting instances...")
         sys.stdout.flush()
         # basic mapping of the general endpoints to the real endpoints
-        config['mythic_address'] = f"http://{os.environ['MYTHIC_SERVER_HOST']}:{os.environ['MYTHIC_SERVER_PORT']}"
+        config['mythic_address'] = f"http://{os.environ['MYTHIC_SERVER_HOST']}:{os.environ['MYTHIC_SERVER_PORT']}/agent_message"
         # now look at the specific instances to start
         for inst in main_config['instances']:
-            config[str(inst['port'])] = {'debug': inst['debug'],
+            config[f"p{str(inst['port'])}"] = {'debug': inst['debug'],
                                          'no_match': inst['no_match'],
                                          'POST': {  # these are server response configurations
                                              'ServerHeaders': inst['POST']['ServerHeaders'],
@@ -294,44 +293,44 @@ if __name__ == "__main__":
             # an instance can have multiple URLs and schemes for each GET/POST, so loop through all of that
             for g in inst['GET']['AgentMessage']:
                 app.add_route(get_agent_message, g['uri'], methods=['GET'])
-                config[str(inst['port'])]['GET'][g['uri']] = {}
+                config[f"p{str(inst['port'])}"]['GET'][g['uri']] = {}
                 # we need to find where the "message" parameter exists so we know where the data will be
                 for p in g['QueryParameters']:
                     if p['value'] == "message":
-                        config[str(inst['port'])]['GET'][g['uri']]['location'] = "QueryParameters"
-                        config[str(inst['port'])]['GET'][g['uri']]['value'] = p
+                        config[f"p{str(inst['port'])}"]['GET'][g['uri']]['location'] = "QueryParameters"
+                        config[f"p{str(inst['port'])}"]['GET'][g['uri']]['value'] = p
                 for p in g['Cookies']:
                     if p['value'] == 'message':
-                        config[str(inst['port'])]['GET'][g['uri']]['location'] = "Cookies"
-                        config[str(inst['port'])]['GET'][g['uri']]['value'] = p
+                        config[f"p{str(inst['port'])}"]['GET'][g['uri']]['location'] = "Cookies"
+                        config[f"p{str(inst['port'])}"]['GET'][g['uri']]['value'] = p
                 for p in g['urlFunctions']:
                     if p['name'] == '<message:string>':
-                        config[str(inst['port'])]['GET'][g['uri']]['location'] = "URI"
-                        config[str(inst['port'])]['GET'][g['uri']]['value'] = p
-                if 'location' not in config[str(inst['port'])]['GET'][g['uri']]:
+                        config[f"p{str(inst['port'])}"]['GET'][g['uri']]['location'] = "URI"
+                        config[f"p{str(inst['port'])}"]['GET'][g['uri']]['value'] = p
+                if 'location' not in config[f"p{str(inst['port'])}"]['GET'][g['uri']]:
                     # if we haven't set it yet, data must be in the body
-                    config[str(inst['port'])]['GET'][g['uri']]['location'] = "Body"
-                    config[str(inst['port'])]['GET'][g['uri']]['value'] = g['Body']
+                    config[f"p{str(inst['port'])}"]['GET'][g['uri']]['location'] = "Body"
+                    config[f"p{str(inst['port'])}"]['GET'][g['uri']]['value'] = g['Body']
             for g in inst['POST']['AgentMessage']:
                 app.add_route(post_agent_message, g['uri'], methods=['POST'])
-                config[str(inst['port'])]['POST'][g['uri']] = {}
+                config[f"p{str(inst['port'])}"]['POST'][g['uri']] = {}
                 # we need to find where the "message" parameter exists so we know where the data will be
                 for p in g['QueryParameters']:
                     if p['value'] == "message":
-                        config[str(inst['port'])]['POST'][g['uri']]['location'] = "QueryParameters"
-                        config[str(inst['port'])]['POST'][g['uri']]['value'] = p
+                        config[f"p{str(inst['port'])}"]['POST'][g['uri']]['location'] = "QueryParameters"
+                        config[f"p{str(inst['port'])}"]['POST'][g['uri']]['value'] = p
                 for p in g['Cookies']:
                     if p['value'] == 'message':
-                        config[str(inst['port'])]['POST'][g['uri']]['location'] = "Cookies"
-                        config[str(inst['port'])]['POST'][g['uri']]['value'] = p
+                        config[f"p{str(inst['port'])}"]['POST'][g['uri']]['location'] = "Cookies"
+                        config[f"p{str(inst['port'])}"]['POST'][g['uri']]['value'] = p
                 for p in g['urlFunctions']:
                     if p['name'] == '<message:string>':
-                        config[str(inst['port'])]['POST'][g['uri']]['location'] = "URI"
-                        config[str(inst['port'])]['POST'][g['uri']]['value'] = p
-                if 'location' not in config[str(inst['port'])]['POST'][g['uri']]:
+                        config[f"p{str(inst['port'])}"]['POST'][g['uri']]['location'] = "URI"
+                        config[f"p{str(inst['port'])}"]['POST'][g['uri']]['value'] = p
+                if 'location' not in config[f"p{str(inst['port'])}"]['POST'][g['uri']]:
                     # if we haven't set it yet, data must be in the body
-                    config[str(inst['port'])]['POST'][g['uri']]['location'] = "Body"
-                    config[str(inst['port'])]['POST'][g['uri']]['value'] = g['Body']
+                    config[f"p{str(inst['port'])}"]['POST'][g['uri']]['location'] = "Body"
+                    config[f"p{str(inst['port'])}"]['POST'][g['uri']]['value'] = g['Body']
 
             keyfile = Path(inst['key_path'])
             certfile = Path(inst['cert_path'])
