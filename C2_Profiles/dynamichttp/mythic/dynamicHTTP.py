@@ -213,7 +213,7 @@ def check_server_layout(server_config) -> dict:
         if "name" not in inst["no_match"]["return_file"]:
             output += f'\n[-] Missing "name" for the file to be returned in no_match case'
             return {"status": "error", "error": output}
-        if not os.path.exists("../c2_code/" + inst["no_match"]["return_file"]["name"]):
+        if not os.path.exists("./c2_code/" + inst["no_match"]["return_file"]["name"]):
             output += f'\n[-] File specified in "no_match" case for "return_file" can\'t be found'
             return {"status": "error", "error": output}
         if "status" not in inst["no_match"]["return_file"]:
@@ -225,13 +225,13 @@ def check_server_layout(server_config) -> dict:
         if "key_path" not in inst:
             output += '\n[-] Missing "key_path" in instance'
             return {"status": "error", "error": output}
-        if inst["key_path"] != "" and not os.path.exists("../c2_code/" + inst["key_path"]):
+        if inst["key_path"] != "" and not os.path.exists("./c2_code/" + inst["key_path"]):
             output += "\n[-] Key_path file can't be found"
             return {"status": "error", "error": output}
         if "cert_path" not in inst:
             output += '\n[-] Missing "cert_path" in instance'
             return {"status": "error", "error": output}
-        if inst["cert_path"] != "" and not os.path.exists("../c2_code/" + inst["cert_path"]):
+        if inst["cert_path"] != "" and not os.path.exists("./c2_code/" + inst["cert_path"]):
             output += "\n[-] cert_path file can't be found"
             return {"status": "error", "error": output}
         if "debug" not in inst:
