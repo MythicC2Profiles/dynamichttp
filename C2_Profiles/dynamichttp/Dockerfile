@@ -1,6 +1,6 @@
 FROM itsafeaturemythic/mythic_python_base:latest
 
-RUN pip3 install sanic
+RUN pip3 install sanic==21.6
 RUN pip3 install requests
 
 WORKDIR /Mythic/
