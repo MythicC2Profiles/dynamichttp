@@ -417,21 +417,6 @@ def check_agent_config_layout(inst):
                     f'{bcolors.FAIL}[-]{bcolors.ENDC} Missing "Body" array in GET message. If none will be supplied, set as empty array []'
                 )
                 sys.exit(1)
-    if "jitter" not in inst:
-        print(f'{bcolors.FAIL}[-]{bcolors.ENDC} Missing "jitter"')
-        sys.exit(1)
-    if "interval" not in inst:
-        print(f'{bcolors.FAIL}[-]{bcolors.ENDC} Missing "interval"')
-        sys.exit(1)
-    if "chunk_size" not in inst:
-        print(f'{bcolors.FAIL}[-]{bcolors.ENDC} Missing "chunk_size"')
-        sys.exit(1)
-    if "key_exchange" not in inst:
-        print(f'{bcolors.FAIL}[-]{bcolors.ENDC} Missing "key_exchange" boolean')
-        sys.exit(1)
-    if "kill_date" not in inst:
-        print(f'{bcolors.FAIL}[-]{bcolors.ENDC} Missing "kill_date"')
-        sys.exit(1)
 
 
 def check_config(server_config, agent_config, method):

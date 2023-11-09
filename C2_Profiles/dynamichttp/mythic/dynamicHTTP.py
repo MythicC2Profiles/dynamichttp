@@ -1,4 +1,5 @@
 from mythic_container.C2ProfileBase import *
+from mythic_container.MythicGoRPC.send_mythic_rpc_file_get_content import *
 import json
 from pathlib import Path
 import os
@@ -12,7 +13,7 @@ def readAgentConfig() -> str:
 
 class DynamicHTTP(C2Profile):
     name = "dynamichttp"
-    description = "Manipulate HTTP(S) requests and responses"
+    description = "Manipulate HTTP(S) requests and responses. Version 2.0"
     author = "@its_a_feature_"
     is_p2p = False
     is_server_routed = False
@@ -29,16 +30,47 @@ class DynamicHTTP(C2Profile):
             crypto_type=True
         ),
         C2ProfileParameter(
-            name="raw_c2_config", description="Agent JSON Config", default_value=readAgentConfig()
+            name="raw_c2_config", description="Agent JSON Config",
+            parameter_type=ParameterType.File,
+            required=True
+        ),
+        C2ProfileParameter(
+            name="killdate", description="Kill Date for the agent to stop running",
+            parameter_type=ParameterType.Date,
+            required=False,
+            default_value=365,
+        ),
+        C2ProfileParameter(
+            name="callback_jitter", description="Jitter percentage",
+            parameter_type=ParameterType.Number,
+            required=False,
+            default_value=23,
+        ),
+        C2ProfileParameter(
+            name="callback_interval", description="Seconds of sleep between messages",
+            parameter_type=ParameterType.Number,
+            required=False,
+            default_value=10,
+        ),
+        C2ProfileParameter(
+            name="encrypted_exchange_check", description="Perform an encrypted key exchange",
+            parameter_type=ParameterType.Boolean,
+            required=False,
+            default_value=True,
         ),
     ]
 
     async def config_check(self, inputMsg: C2ConfigCheckMessage) -> C2ConfigCheckMessageResponse:
         output = ""
         try:
+            configData = await SendMythicRPCFileGetContent(MythicRPCFileGetContentMessage(
+                AgentFileId=inputMsg.Parameters["raw_c2_config"]
+            ))
+            if not configData.Success:
+                return C2ConfigCheckMessageResponse(Success=False, Error=configData.Error)
             with open("./c2_code/config.json") as f:
                 config = json.load(f)
-                agent_config = json.loads(inputMsg.Parameters["raw_c2_config"])
+                agent_config = json.loads(configData.Content)
                 output += f"\n[*] Checking server config for layout structure"
                 status = check_server_layout(config)
                 if status["status"] == "error":
@@ -65,6 +97,101 @@ class DynamicHTTP(C2Profile):
                 return C2ConfigCheckMessageResponse(Success=True, Message=output)
         except Exception as e:
             return C2ConfigCheckMessageResponse(Success=False, Error=str(sys.exc_info()[-1].tb_lineno) + str(e))
+
+    async def redirect_rules(self, inputMsg: C2GetRedirectorRulesMessage) -> C2GetRedirectorRulesMessageResponse:
+        """Generate Apache ModRewrite rules given the Payload's C2 configuration
+
+        :param inputMsg: Payload's C2 Profile configuration
+        :return: C2GetRedirectorRulesMessageResponse detailing some Apache ModRewrite rules for the payload
+        """
+        configData = await SendMythicRPCFileGetContent(MythicRPCFileGetContentMessage(
+            AgentFileId=inputMsg.Parameters["raw_c2_config"]
+        ))
+        if not configData.Success:
+            return C2GetRedirectorRulesMessageResponse(Success=False, Error=configData.Error)
+        agentContentJSON = json.loads(configData.Content)
+        checking_config = check_agent_config_layout(agentContentJSON)
+        if checking_config["status"] == "error":
+            return C2GetRedirectorRulesMessageResponse(Success=False, Error=checking_config["error"])
+        response = C2GetRedirectorRulesMessageResponse(Success=True)
+        output = "########################################\n"
+        output += "## .htaccess START\n"
+        output += "RewriteEngine On\n"
+        with open("./c2_code/config.json") as f:
+            config = json.load(f)
+            for i in range(len(config["instances"])):
+                output += f"#### Instance {i} ####\n"
+                # check if the agent config matches this instance
+                if check_if_agent_config_matches_server_instance(config["instances"][i], agentContentJSON):
+                    # process GET message
+                    output += "RewriteCond %{REQUEST_METHOD} GET [NC]\n"
+                    getUserAgents = [x["AgentHeaders"]["User-Agent"] for x in agentContentJSON["GET"]["AgentMessage"]]
+                    getUserAgents = [x.replace('(', '\\(').replace(')', '\\)') for x in getUserAgents]
+                    for x in getUserAgents:
+                        output += f"RewriteCond %{{HTTP_USER_AGENT}} \"{x}\"\n"
+                    keyfile = Path(config["instances"][i]['key_path'])
+                    certfile = Path(config["instances"][i]['cert_path'])
+                    url = "http://"
+                    if keyfile.is_file() and certfile.is_file():
+                        url = "https://"
+                    url += f"C2_SERVER_HERE:{config['instances'][i]['port']}"
+                    url += "%{REQUEST_URI}\" [P,L]"
+                    output += f"RewriteRule ^.*$ {url}\n"
+                    # process POST message
+                    output += "RewriteCond %{REQUEST_METHOD} POST [NC]\n"
+                    postUserAgents = [x["AgentHeaders"]["User-Agent"] for x in agentContentJSON["POST"]["AgentMessage"]]
+                    postUserAgents = [x.replace('(', '\\(').replace(')', '\\)') for x in postUserAgents]
+                    for x in postUserAgents:
+                        output += f"RewriteCond %{{HTTP_USER_AGENT}} \"{x}\"\n"
+                    keyfile = Path(config["instances"][i]['key_path'])
+                    certfile = Path(config["instances"][i]['cert_path'])
+                    url = "http://"
+                    if keyfile.is_file() and certfile.is_file():
+                        url = "https://"
+                    url += f"C2_SERVER_HERE:{config['instances'][i]['port']}"
+                    url += "%{REQUEST_URI}\" [P,L]"
+                    output += f"RewriteRule ^.*$ {url}\n"
+        output += "### everything else gets redirected ####\n"
+        output += "RewriteRule ^.*$ redirect/? [L,R=302]\n"
+        output += "## .htaccess END\n"
+        output += "########################################\n"
+        response.Message = output
+        return response
+
+    async def host_file(self, inputMsg: C2HostFileMessage) -> C2HostFileMessageResponse:
+        """Host a file through a c2 channel
+
+        :param inputMsg: The file UUID to host and which URL to host it at
+        :return: C2HostFileMessageResponse detailing success or failure to host the file
+        """
+        response = C2HostFileMessageResponse(Success=False)
+        try:
+            config = json.load(open("./c2_code/config.json", "r"))
+            for i in range(len(config["instances"])):
+                if "payloads" not in config["instances"][i]:
+                    config["instances"][i]["payloads"] = {}
+                config["instances"][i]["payloads"][inputMsg.HostURL] = inputMsg.FileUUID
+            with open("./c2_code/config.json", 'w') as configFile:
+                configFile.write(json.dumps(config, indent=4))
+            response.Success = True
+            response.Message = "Successfully updated"
+        except Exception as e:
+            response.Error = f"{e}"
+        return response
+
+
+def check_if_agent_config_matches_server_instance(server_instance, agent_config) -> bool:
+    methods = ["GET", "POST"]
+    for method in methods:
+        if server_instance[method]["ServerBody"] != agent_config[method]["ServerBody"]:
+            return False
+        if server_instance[method]["ServerHeaders"] != agent_config[method]["ServerHeaders"]:
+            return False
+        if server_instance[method]["ServerCookies"] != agent_config[method]["ServerCookies"]:
+            return False
+        if server_instance[method]["AgentMessage"] != agent_config[method]["AgentMessage"]:
+            return False
+    return True
 
 
 def check_server_layout(server_config) -> dict:
@@ -340,21 +467,6 @@ def check_agent_config_layout(inst):
             if "Body" not in m:
                 output += f'\n[-] Missing "Body" array in GET message. If none will be supplied, set as empty array []'
                 return {"status": "error", "error": output}
-    if "jitter" not in inst:
-        output += '\n[-] Missing "jitter"'
-        return {"status": "error", "error": output}
-    if "interval" not in inst:
-        output += '\n[-] Missing "interval"'
-        return {"status": "error", "error": output}
-    if "chunk_size" not in inst:
-        output += '\n[-] Missing "chunk_size"'
-        return {"status": "error", "error": output}
-    if "key_exchange" not in inst:
-        output += '\n[-] Missing "key_exchange" boolean'
-        return {"status": "error", "error": output}
-    if "kill_date" not in inst:
-        output += '\n[-] Missing "kill_date"'
-        return {"status": "error", "error": output}
     return {"status": "success", "output": output}
 
 

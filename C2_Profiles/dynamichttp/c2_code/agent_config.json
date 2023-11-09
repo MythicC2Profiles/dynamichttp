@@ -63,7 +63,7 @@
           "transforms": [
             {
               "function": "random_alpha",
-              "parameters": [30]
+              "parameters": ["30"]
             },
             {
               "function": "base64",
@@ -132,10 +132,5 @@
         }
       ]
     }]
-  },
-  "jitter": 50,
-  "interval": 10,
-  "chunk_size": 5120000,
-  "key_exchange": true,
-  "kill_date": ""
+  }
 }

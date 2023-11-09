@@ -17,7 +17,7 @@ import os
 config = {}
 
 
-async def r_base64(*args):
+async def reverse_base64(*args):
     # called with base64(value)
     if isinstance(args[0], str):
         return b64.b64decode(args[0].encode())
@@ -30,7 +30,7 @@ async def base64(*args):
     return b64.b64encode(args[0]).decode('utf-8')
 
 
-async def r_prepend(*args):
+async def reverse_prepend(*args):
     # called with prepend(value, "string")
     return args[0][len(args[1]):]
 
@@ -40,7 +40,7 @@ async def prepend(*args):
     return str(args[1]) + str(args[0])
 
 
-async def r_append(*args):
+async def reverse_append(*args):
     # called with append(value, "string")
     return args[0][:len(args[0]) - len(args[1])]
 
@@ -53,11 +53,11 @@ async def append(*args):
 async def random_mixed(*args):
     # called with random_mixed(value, 10), always appends
     letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-    rnd = ''.join(random.choice(letters) for i in range(args[1]))
+    rnd = ''.join(random.choice(letters) for i in range(int(args[1])))
     return args[0] + rnd
 
 
-async def r_random_mixed(*args):
+async def reverse_random_mixed(*args):
     # called with random_mixed(value, 10), always appends
     # return the string going from 0 to -10 (or ten from the end)
     return args[0][: -1 * args[1]]
@@ -66,11 +66,11 @@ async def r_random_mixed(*args):
 async def random_number(*args):
     # called with random_number(value, 10)
     letters = "0987654321"
-    rnd = ''.join(random.choice(letters) for i in range(args[1]))
+    rnd = ''.join(random.choice(letters) for i in range(int(args[1])))
     return args[0] + rnd
 
 
-async def r_random_number(*args):
+async def reverse_random_number(*args):
     # called with random_mixed(value, 10), always appends
     # return the string going from 0 to -10 (or ten from the end)
     return args[0][: -1 * args[1]]
@@ -79,11 +79,11 @@ async def r_random_number(*args):
 async def random_alpha(*args):
     # called with random_alpha(value, 10), always appends
     letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-    rnd = ''.join(random.choice(letters) for i in range(args[1]))
+    rnd = ''.join(random.choice(letters) for i in range(int(args[1])))
     return args[0] + rnd
 
 
-async def r_random_alpha(*args):
+async def reverse_random_alpha(*args):
     # called with random_mixed(value, 10), always appends
     # return the string going from 0 to -10 (or ten from the end)
     return args[0][: -1 * args[1]]
@@ -95,7 +95,7 @@ async def choose_random(*args):
     return args[0] + choice
 
 
-async def r_choose_random(*args):
+async def reverse_choose_random(*args):
     # called with choose_random(value, opt1, opt2, opt3...)
     for e in args[1:]:
         if e in args[0]:
@@ -106,7 +106,7 @@ async def get_value(value, transforms):
     # given an obfuscated value, apply transforms to get back the value we need
     # await print_flush(transforms)
     for step in transforms[::-1]:
-        value = await globals()["r_" + step['function']](value, *step['parameters'])
+        value = await globals()["reverse_" + step['function']](value, *step['parameters'])
     return value
 
 
@@ -130,7 +130,7 @@ async def create_response(request, data, status=200, method="POST"):
             await print_flush("response of: {}".format(data))
             await print_flush("response data: {}\n".format(data))
             await print_flush("response headers: {}\n".format(headers))
-            await print_flush("response_cookies: {}\n".format(cookies))
+            await print_flush("response cookies: {}\n".format(cookies))
         if isinstance(data, str):
             data = data.encode()
         response = raw(data, status=status, headers=headers)
@@ -162,6 +162,11 @@ async def no_match(request, exception):
 
 
 async def print_flush(message):
+    print(message)
+    sys.stdout.flush()
+
+
+def print_flush_sync(message):
     print(message)
     sys.stdout.flush()
 
@@ -249,14 +254,41 @@ async def post_agent_message(request, **kwargs):
         return await no_match(request, NotFound)
 
 
+def get_file(agent_file_id):
+    def custom_get_file(request, **kwargs):
+        global config
+        forwarded_headers = {
+            "x-forwarded-for": request.headers["x-forwarded-for"] if "x-forwarded-for" in request.headers else request.ip,
+            "x-forwarded-url": request.url,
+            "x-forwarded-query": request.query_string,
+            "x-forwarded-port": str(request.server_port),
+            "x-forwarded-cookies": str(request.cookies)
+        }
+        try:
+            if config[request.app.name]['debug']:
+                print_flush_sync("get_file request from: {} with {} and {}".format(request.url, request.cookies, request.headers))
+            request_address = f"http://{config['mythic_server_host']}:{config['mythic_server_port']}/direct/download/{agent_file_id}"
+            if config[request.app.name]['debug']:
+                print_flush_sync(f"forwarding request to {request_address}")
+            response = requests.get(request_address, verify=False, headers={"Mythic": "dynamichttp", **forwarded_headers})
+            return raw(response.content, status=response.status_code, headers=response.headers)
+        except Exception as e:
+            if config[request.app.name]['debug']:
+                print_flush_sync("error in post_agent_message: {}".format(str(e)))
+            return html("Error: Requested URL {} not found\n".format(request.url), status=404)
+    return custom_get_file
+
+
 if __name__ == "__main__":
     try:
         config_file = open("config.json", 'rb')
-        main_config = json.loads(config_file.read().decode('utf-8'))
+        main_config = json.load(config_file)
         print("Opening config and starting instances...")
         sys.stdout.flush()
         # basic mapping of the general endpoints to the real endpoints
         config['mythic_address'] = f"http://{os.environ['MYTHIC_SERVER_HOST']}:{os.environ['MYTHIC_SERVER_PORT']}/agent_message"
+        config["mythic_server_host"] = os.environ['MYTHIC_SERVER_HOST']
+        config["mythic_server_port"] = os.environ['MYTHIC_SERVER_PORT']
         # now look at the specific instances to start
         for inst in main_config['instances']:
             config[f"p{str(inst['port'])}"] = {'debug': inst['debug'],
@@ -276,7 +308,7 @@ if __name__ == "__main__":
             else:
                 print("Debugging output is disabled")
             sys.stdout.flush()
-            # now to create an app instance too handle responses
+            # now to create an app instance to handle responses
             app = Sanic(f"p{str(inst['port'])}")
             app.config['REQUEST_MAX_SIZE'] = 1000000000
             app.config['REQUEST_TIMEOUT'] = 600
@@ -289,7 +321,6 @@ if __name__ == "__main__":
             #   2. what needs to be done to access the value
             #       (access specific field, certain offset into data, decode first, etc)
             #   3. what needs to be done to get the final value out (decode, remove extra data, etc)
-
             # an instance can have multiple URLs and schemes for each GET/POST, so loop through all of that
             for g in inst['GET']['AgentMessage']:
                 app.add_route(get_agent_message, g['uri'], methods=['GET'])
@@ -331,7 +362,10 @@ if __name__ == "__main__":
                     # if we haven't set it yet, data must be in the body
                     config[f"p{str(inst['port'])}"]['POST'][g['uri']]['location'] = "Body"
                     config[f"p{str(inst['port'])}"]['POST'][g['uri']]['value'] = g['Body']
-
+            if "payloads" in inst:
+                for route, file_id in inst["payloads"].items():
+                    print(route, file_id)
+                    app.add_route(get_file(agent_file_id=file_id), route, methods=['GET'])
             keyfile = Path(inst['key_path'])
             certfile = Path(inst['cert_path'])
             if keyfile.is_file() and certfile.is_file():
