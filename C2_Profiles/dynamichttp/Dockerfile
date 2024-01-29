@@ -1,8 +1,10 @@
-FROM itsafeaturemythic/mythic_python_base:latest
+#FROM itsafeaturemythic/mythic_python_base:latest
 
-RUN pip3 install sanic==21.6
-RUN pip3 install requests
+#RUN pip3 install sanic==21.6
+#RUN pip3 install requests
 
-WORKDIR /Mythic/
+#WORKDIR /Mythic/
 
-CMD ["python3", "main.py"]
+#CMD ["python3", "main.py"]
+
+FROM ghcr.io/mythicc2profiles/dynamichttp:v0.0.0.0
