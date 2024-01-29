@@ -7,4 +7,4 @@
 
 #CMD ["python3", "main.py"]
 
-FROM ghcr.io/mythicc2profiles/dynamichttp:v0.0.0.0
+FROM ghcr.io/mythicc2profiles/dynamichttp:v0.0.1
