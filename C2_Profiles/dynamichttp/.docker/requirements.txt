@@ -4,6 +4,6 @@ ujson==5.7.0
 aiohttp==3.8.3
 psutil==5.9.4
 pycryptodome
-mythic-container==0.4.5
+mythic-container==0.4.10
 sanic==21.6
 requests
