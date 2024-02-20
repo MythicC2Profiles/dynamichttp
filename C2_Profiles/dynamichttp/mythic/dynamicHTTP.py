@@ -537,8 +537,9 @@ def check_match_to_server(server_config, agent_message):
             server_options += f"\n   \t\t\t\tURI: {g['uri']}"
             if agent_message["uri"] != g["uri"]:
                 continue
-            if not urls_match(agent_message["urls"], g["urls"]):
-                continue
+            # don't worry abou tmatching urls since there could be redirectors
+            #if not urls_match(agent_message["urls"], g["urls"]):
+            #    continue
             output += f"\n   \t\t\tFound matching URLs and URI"
             if agent_message["location"] == "Body":
                 output += f"\n   \t\tChecking for matching transforms on the message Body"

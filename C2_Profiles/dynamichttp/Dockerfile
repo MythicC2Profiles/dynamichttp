@@ -1,10 +1,16 @@
-#FROM itsafeaturemythic/mythic_python_base:latest
+FROM itsafeaturemythic/mythic_python_base:latest as builder
 
-#RUN pip3 install sanic==21.6
-#RUN pip3 install requests
+COPY [".docker/requirements.txt", "requirements.txt"]
+RUN python3 -m pip wheel --wheel-dir /wheels -r requirements.txt
 
-#WORKDIR /Mythic/
+FROM python:3.11-slim-bookworm
 
-#CMD ["python3", "main.py"]
+COPY --from=builder /wheels /wheels
 
-FROM ghcr.io/mythicc2profiles/dynamichttp:v0.0.1
+RUN pip install --no-cache /wheels/*
+
+WORKDIR /Mythic/
+
+COPY [".", "."]
+
+CMD ["python3", "main.py"]

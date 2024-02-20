@@ -471,8 +471,8 @@ def check_match_to_server(server_config, agent_message):
             match = False
             if agent_message["uri"] != g["uri"]:
                 continue
-            if not urls_match(agent_message["urls"], g["urls"]):
-                continue
+            #if not urls_match(agent_message["urls"], g["urls"]):
+            #    continue
             else:
                 print(
                     f"{bcolors.OKBLUE}[*]{bcolors.ENDC} Found matching URLs and URI, checking rest of AgentMessage"

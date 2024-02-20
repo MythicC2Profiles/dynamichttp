@@ -292,7 +292,7 @@ async def reverse_function_name(*args):
               "transforms": [
                 {
                   "function": "random_alpha",
-                  "parameters": [30]
+                  "parameters": ["30"]
                 },
                 {
                   "function": "base64",
@@ -456,7 +456,7 @@ async def reverse_function_name(*args):
           "transforms": [
             {
               "function": "random_alpha",
-              "parameters": [30]
+              "parameters": ["30"]
             },
             {
               "function": "base64",
