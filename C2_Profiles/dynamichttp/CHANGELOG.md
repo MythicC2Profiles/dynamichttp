@@ -1,4 +1,10 @@
 
+## 2.0.1 - 2026-02-10
+
+### Changed
+
+- Adjusted how loops are managed at the start of the c2 server code
+
 ## 2.0.0
 
 ### Updated

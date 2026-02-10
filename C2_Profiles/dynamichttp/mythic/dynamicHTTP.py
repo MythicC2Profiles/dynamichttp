@@ -15,6 +15,7 @@ class DynamicHTTP(C2Profile):
     name = "dynamichttp"
     description = "Manipulate HTTP(S) requests and responses. Version 2.0"
     author = "@its_a_feature_"
+    semver = "v2.0.1"
     is_p2p = False
     is_server_routed = False
     server_folder_path = Path(".") / "c2_code"

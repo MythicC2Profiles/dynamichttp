@@ -281,6 +281,8 @@ def get_file(agent_file_id):
 
 if __name__ == "__main__":
     try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         config_file = open("config.json", 'rb')
         main_config = json.load(config_file)
         print("Opening config and starting instances...")
@@ -388,7 +390,6 @@ if __name__ == "__main__":
                     server = app.create_server(host="0.0.0.0", port=inst['port'], debug=False, return_asyncio_server=True, access_log=False)
             task = asyncio.ensure_future(server)
         try:
-            loop = asyncio.get_event_loop()
             def callback(fut):
                 try:
                     fetch_count = fut.result()
